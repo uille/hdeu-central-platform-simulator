@@ -1,0 +1,38 @@
+# Stub Dispatcher service for dispatcher-disabled deployments.
+#
+# This compose file starts a minimal HTTP stub that mimics the
+# hdeu-dispatcher REST API surface. All requests are ACKed with
+# the correct HTTP status codes; payloads are silently dropped.
+#
+# Usage:
+#   docker compose up -d --build
+#
+# The stub listens on port 5100 (the dispatcher's internal HTTP port).
+# Configure hdeu-access to point to it:
+#   DISPATCHER_URL=http://stub-dispatcher:5100
+#
+# To fully disable dispatcher messaging, also set the scheduler
+# intervals to very large values (see README.md).
+
+services:
+  stub-dispatcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stub-dispatcher
+    ports:
+      - "5100:5100"
+    networks:
+      - mongo-network
+      - ui-repo-network
+      - proxy-ui-network
+      - default
+    restart: unless-stopped
+
+networks:
+  mongo-network:
+    external: true
+  ui-repo-network:
+    external: true
+  proxy-ui-network:
+    external: true

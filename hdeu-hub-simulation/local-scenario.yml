@@ -567,7 +567,7 @@ services:
       - KC_HTTP_RELATIVE_PATH=/keycloak
       - KC_PROXY=edge
       - KC_PROXY_HEADERS=xforwarded
-      - KC_LOG_LEVEL=debug
+      - KC_LOG_LEVEL=info
     healthcheck:
       test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /keycloak/realms/healthdata/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'" ]
       interval: 30s

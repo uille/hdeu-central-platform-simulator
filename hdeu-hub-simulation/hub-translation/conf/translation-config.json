@@ -1,0 +1,59 @@
+{
+  "TRANSLATION_SERVICE": {
+    "name": "DEU Translation Service",
+    "port": 8080,
+    "api_key": "bc6dba36-e87e-4c27-95ba-ff3777acc703",
+    "accepted_languages": [
+      "bg",
+      "cs",
+      "da",
+      "de",
+      "el",
+      "en",
+      "es",
+      "et",
+      "fi",
+      "fr",
+      "ga",
+      "hr",
+      "hu",
+      "is",
+      "it",
+      "lt",
+      "lv",
+      "mt",
+      "nb",
+      "nl",
+      "nn",
+      "pl",
+      "pt",
+      "ro",
+      "sk",
+      "sl",
+      "sv"
+    ]
+  },
+  "DATABASE": {
+    "jdbc_max_pool_size": 1000,
+    "host": "statistic-db",
+    "port": 5432,
+    "db_name": "translations_db",
+    "user": "db_user",
+    "password": "wqwdqwefsdaw34%",
+    "ssl_mode": "prefer"
+  },
+  "E_TRANSLATION": {
+    "user": "etranslation_user",
+    "application": "etranslation_application",
+    "password": "etranslation_password",
+    "e_translation_url": "https://webgate.ec.europa.eu/etranslation/si/translate",
+    "callback_url": "http://localhost:8080",
+    "domain": "SPD",
+    "simultaneous_translations": 5,
+    "timeout": 0,
+    "request_interval": 2000,
+    "snippet_interval": 100,
+    "keep_finalized": false,
+    "is_development": true
+  }
+}

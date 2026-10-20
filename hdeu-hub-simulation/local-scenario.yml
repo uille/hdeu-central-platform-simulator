@@ -1,0 +1,584 @@
+version: '3.9'
+name: healthdata
+networks:
+  elastic-nw:
+    name: elastic-network
+  mongo-nw:
+    name: mongo-network
+  virtuoso-repo-nw:
+    name: virtuoso-repo-network
+  search-repo-nw:
+    name: search-repo-network
+  data-upload-repo-nw:
+    name: data-upload-network
+  ui-search-nw:
+    name: ui-search-network
+  ui-repo-nw:
+    name: ui-repo-network
+  ui-virtuoso-nw:
+    name: "ui-virtuoso-network"
+  ui-data-upload-nw:
+    name: "ui-data-upload-network"
+  # statistic-db-nw:
+  #   name: "statistic-db-network"
+  search-statistic-nw:
+    name: "search-statistic-network"
+  # statistics-ui-nw:
+  #   name: "statistics-ui-network"
+  proxy-ui-nw:
+    name: "proxy-ui-network"
+  # domibus-europe_cross-country-network:
+  #   external: true
+  # needs to be created manually unless domibus compose files (under /domibus) are started:
+  # docker network create domibus-europe_cross-country-network
+
+services:
+  reverse-proxy:
+    image: reverse-proxy:latest
+    container_name: httpd-proxy
+    build:
+      context: .
+      dockerfile: Dockerfile_scenario
+    ports:
+      - '${WEB_PORT}:8092'
+    environment:
+      - SERVER_NAME=${WEB_HOST_NAME}
+    depends_on:
+      - hdeu-hub-ui
+      - hdeu-hub-repo
+      - hdeu-access
+    networks:
+      proxy-ui-nw:
+        aliases:
+          - ${WEB_HOST_NAME} # This is the server name used in the reverse proxy and is needed for keycloak to work properly with health-data-auth
+
+  hdeu-hub-repo:
+    image: hdeu-hub-repo:latest
+    logging:
+      options:
+        max-size: "50m"
+    container_name: hdeu-hub-repo
+    build:
+      context: ../hdeu-hub-repo # the locatfion of the Dockerfile for the project (local f/s where the project is cloned)
+    ports:
+      - "9080:8080"
+      - "5006:5006" # debug port
+    volumes:
+      - ./hub-repo/conf/config.json:/usr/verticles/conf/config.json
+      - ./hub-repo/profiles/healthdcatap:/usr/verticles/profiles/healthdcatap
+    environment:
+      - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006
+      - HUB_REPO_API_KEY=7c6a7c98-20e1-4915-ba0c-985b6724560b
+      - HUB_SEARCH_SERVICE_API_KEY=a92b814f-63f8-4a5d-abc7-8710de0d2e86
+      - HUB_SEARCH_SERVICE_URL=hdeu-hub-search
+      - HUB_SEARCH_SERVICE_PORT=8080
+      - TRANSLATION_SERVICE_API_KEY=bc6dba36-e87e-4c27-95ba-ff3777acc703
+      - TRANSLATION_SERVICE_URL=http://hdeu-hub-translation:8080/translation-service
+      - TRANSLATION_SERVICE_CALLBACK_URL=http://hdeu-hub-repo:8080/translation
+      - HUB_STORE_DATA_UPLOAD_URL=http://hdeu-hub-store:8080
+      - HUB_STORE_DATA_UPLOAD_SERVICE_URL=http://hdeu-hub-store:8080
+      - HUB_STORE_DATA_UPLOAD_API_KEY=0e3296cb-5106-4d77-9e9d-25ef9b6eac71
+      - VIRTUOSO_CONFIG_URL=http://virtuoso:8890
+      - VIRTUOSO_CONFIG_USER=dba
+      - VIRTUOSO_CONFIG_PASS=dba
+      - SHADOW_VIRTUOSO_CONFIG_URL=http://shadow-virtuoso:8890
+      - SHADOW_VIRTUOSO_CONFIG_USER=dba
+      - SHADOW_VIRTUOSO_CONFIG_PASS=dba
+      - ITB_VALIDATOR_ENDPOINT=https://health-data-itb-rdf-validator.acceptance.data.health.europa.eu/shacl/ehds/api/validate
+    depends_on:
+      - hdeu-hub-search
+      - hdeu-hub-store
+      - virtuoso
+      - shadow-virtuoso
+    networks:
+      virtuoso-repo-nw: {}
+      search-repo-nw: {}
+      data-upload-repo-nw: {}
+      ui-repo-nw: {}
+      proxy-ui-nw: {}
+
+  # hdeu-hub-translation:
+  #   image: hdeu-hub-translation:latest
+  #   logging:
+  #     options:
+  #       max-size: "50m"
+  #   container_name: hdeu-hub-translation
+  #   build:
+  #     context: ../hdeu-hub-translation
+  #   ports:
+  #     - "8084:8080"
+  #     - "5004:5004"
+  #   volumes:
+  #     - ./hub-translation/conf/translation-config.json:/usr/verticles/conf/translation-config.json
+  #   environment:
+  #     - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5004
+  #     - HUB_TRANSLATION_API_KEY=bc6dba36-e87e-4c27-95ba-ff3777acc703
+  #     - DB_HOST=statistic-db
+  #     - DB_PORT=5432
+  #     - DB_NAME=translations_db
+  #     - DB_USER=db_user
+  #     - DB_PASSWORD=wqwdqwefsdaw34%
+  #     - SSL_MODE=PREFER
+  #     - E_TRANSLATION_USER=
+  #     - E_TRANSLATION_PASSWORD=
+  #     - E_TRANSLATION_CALLBACK=http://localhost:8080
+  #     - E_TRANSLATION_DOMAIN=SPD
+  #   depends_on:
+  #     - hdeu-hub-repo
+  #     - statistic-db
+  #   networks:
+  #     ui-repo-nw: { }
+  #     proxy-ui-nw: { }
+  #     statistic-db-nw: { }
+
+  hdeu-hub-ui:
+    image: hdeu-hub-ui:latest
+    logging:
+      options:
+        max-size: "50m"
+    container_name: hdeu-hub-ui
+    build: ../hdeu-hub-ui # the location of the Dockerfile for the project (local f/s where the project is cloned)
+    ports:
+      - "8080:8080"
+    environment:
+      - JAVA_OPTS=-Xms300m -Xmx1g
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:?}
+      - VITE_API_HUB_URL=${VITE_API_HUB_URL:?}
+      - VITE_API_QUALITY_BASE_URL=${VITE_API_QUALITY_BASE_URL:?}
+      - VITE_API_SIMILARITY_BASE_URL=${VITE_API_SIMILARITY_BASE_URL:?}
+      - VITE_API_FILE_UPLOAD_URL=${VITE_API_FILE_UPLOAD_URL:?}
+      - VITE_API_SPARQL_URL=${VITE_API_SPARQL_URL:?}
+      
+      - VITE_API_GAZETTEER_BASE_URL=${VITE_API_GAZETTEER_BASE_URL:-https://data.europa.eu/api/hub/search/gazetteer/}
+      - VITE_API_CATALOG_BASE_URL=${VITE_API_CATALOG_BASE_URL:-https://europeandataportal.eu/}
+      
+      - VITE_API_CORSPROXY_API_URL=${VITE_API_CORSPROXY_API_URL:?}
+      - VITE_DATA_ACCESS_URL=${VITE_DATA_ACCESS_URL:?}
+      - VITE_DATA_AUTH_URL=${VITE_DATA_AUTH_URL:?}
+      - VITE_STATISTICS_URL=${VITE_STATISTICS_URL:?}
+      - VITE_DS_DETAILS_CODE_VALUES_CUTOFF=1
+      - VITE_LOCK_INACTIVITY_WARNING_MS=${VITE_LOCK_INACTIVITY_WARNING_MS:-1800000}
+#     The below property is the drupal cms address used to fetch premade content for the hub ui
+#      You can either keep the acceptance url in order to have the premade content available
+#      or point it to your local drupal instance to work with custom content
+      - VITE_API_DRUPAL_URL_ACCEPTANCE=https://health-data-drupal.acceptance.data.health.europa.eu/
+#     - VITE_API_DRUPAL_URL_ACCEPTANCE=http://localhost:8087/
+      - VITE_API_DRUPAL_VISIBILITY_FLAG=true
+    depends_on:
+      hdeu-hub-repo:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    networks:
+      ui-search-nw: {}
+      ui-repo-nw: {}
+      ui-virtuoso-nw: {}
+      ui-data-upload-nw: {}
+      proxy-ui-nw: {}
+
+  hdeu-hub-search:
+    image: hdeu-hub-search:latest
+    logging:
+      options:
+        max-size: "50m"
+    container_name: hdeu-hub-search
+    build:
+      context: ../hdeu-hub-search # the location of the Dockerfile for the project (local f/s where the project is cloned)
+    volumes:
+      - ./hub-search/conf:/usr/verticles/conf
+    networks:
+      elastic-nw: {}
+      search-repo-nw: {}
+      ui-search-nw: {}
+      search-statistic-nw: {}
+      proxy-ui-nw: {}
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    environment:
+      - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007
+    ports:
+      - "8082:8080"
+      - "8083:8081"
+      - "5007:5007" # debug port
+
+  hdeu-hub-store:
+    image: hdeu-hub-store:latest
+    container_name: hdeu-hub-store
+    build: ../hdeu-hub-store # the location of the Dockerfile for the project (local f/s where the project is cloned)
+    logging:
+      options:
+        max-size: "50m"
+    networks:
+      mongo-nw: {}
+      data-upload-repo-nw: {}
+      ui-data-upload-nw: {}
+      proxy-ui-nw: {}
+    depends_on:
+      - mongodb
+    volumes:
+      - hub_data_upload:/usr/verticles/simplestore
+    environment:
+      - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5009
+      - MONGO_DB_URI=mongodb://mongoAdmin:mongoSecret123!@mongodb:27017/?authSource=admin
+      - MONGO_DB=fileuploaderdb
+      - HTTP_PORT=8080
+      - PIVEAU_STORE_API_KEY=0e3296cb-5106-4d77-9e9d-25ef9b6eac71
+      - STORAGE_BACKEND=FS
+    ports:
+      - "8081:8080"
+      - "5009:5009" # debug port
+
+  hdeu-access:
+    image: hdeu-access:latest
+    container_name: hdeu-access
+    build: ../hdeu-access # the location of the Dockerfile for the project (local f/s where the project is cloned)
+    logging:
+      options:
+        max-size: "50m"
+    networks:
+      mongo-nw: {}
+      ui-repo-nw: {}
+      proxy-ui-nw: {}
+    depends_on:
+      mongodb:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    environment:
+      - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+      - MONGO_DB_URI=mongodb://mongoAdmin:mongoSecret123!@mongodb:27017/?authSource=admin
+      - MONGO_DB=healthData-DataAccessDB
+      - HTTP_PORT=8080
+      - HUB_STORE_UPLOAD_DATA_URL=http://hdeu-hub-store:8080
+      - DATA_ACCESS_DISPATCHER_INTERVAL=60000
+      - DATA_REQUEST_DISPATCHER_INTERVAL=60000
+      - DATA_ACCESS_DISPATCHER_MAX_RETRIES=10
+      - DATA_REQUEST_DISPATCHER_MAX_RETRIES=10
+      - DISPATCHER_URL=http://health-data-dispatcher:5100
+      - AUTH_URL=http://hdeu-auth:8080
+      - PIVEAU_STORE_API_KEY=0e3296cb-5106-4d77-9e9d-25ef9b6eac71
+      - HEALTH_DATA_ACCESS_API_KEY=c0107b96-78a1-408e-b05f-a65eb3a3d0a8
+      - DISPATCHER_X_API_KEY=47173bdf-bba8-436c-912c-ad12be97ba34
+      - HUB_REPO_URL=http://hdeu-hub-repo:8080
+      - HUB_REPO_X_API_KEY=7c6a7c98-20e1-4915-ba0c-985b6724560b
+      - TRANSLATION_SERVICE_URL=http://hdeu-hub-translation:8080/translation-service
+      - TRANSLATION_SERVICE_FILE_URL=http://hdeu-hub-translation:8080/file-translation-service
+      - TRANSLATION_SERVICE_CALLBACK_URL=http://hdeu-access:8080/translation
+      - TRANSLATION_SERVICE_X_API_KEY=bc6dba36-e87e-4c27-95ba-ff3777acc703
+      - TRANSLATION_RETRY_INTERVAL=18000000
+      - TRANSLATION_RETRY_MAX_ATTEMPTS=3
+      - CONTROLLED_VOCABULARY_REFRESH_INTERVAL=60000
+      - KEYCLOAK_INTROSPECT_PATH=/realms/healthdata/protocol/openid-connect/token/introspect
+      - 'PIVEAU_ACCESS_AUTH_CONFIG={"issuer": "${KEYCLOAK_DOCKER_ADDRESS}/realms/healthdata","clientId":"eu-login-client","clientSecret":"HCOZDh8XP2cDBuyidDDnqdFrL2haM31s","customSecret":"","tokenServerConfig":{"keycloak":{"serverUrl":"${KEYCLOAK_DOCKER_ADDRESS}","realm":"healthdata","clientId":"eu-login-client","clientSecret":"HCOZDh8XP2cDBuyidDDnqdFrL2haM31s"}}}'
+      - HUB_SEARCH_DATA_URL=http://hdeu-hub-search:8080
+      - EXPORT_DATA_ACCESS_API_KEY=0e3296cb-5106-4d77-9e9d-25ef9b6eac71gv
+      - ITB_VALIDATOR_ENDPOINT=https://health-data-itb-rdf-validator.acceptance.data.health.europa.eu/shacl/ehds/api/validate
+      - OUTGOING_APPLICATION_ACTIVITIES_INTERVAL=60000
+      - OUTGOING_APPLICATION_ACTIVITIES_ENABLE=1
+      - WITHDRAW_RUN_TIME=06:00
+      - WITHDRAW_THRESHOLD_DAYS=28
+      - ADDITIONAL_INFO_WITHDRAW_THRESHOLD_DAYS=28
+      - MAIL_SERVICE_BASE_URL=http://hdeu-mail:1025
+      - MAIL_SERVICE_X_API_KEY=c3b8b49e-9f4b-4c44-8c3b-6b7e56e0c5e3
+      - MAIL_APPLICATIONS_BASE_URL=http://healthdata-local.com/healthdata-central-platform/
+      - EXPIRATION_DAYS=90
+      - DECISION_TRANSLATION_INTERVAL=30000
+      - DECISION_SYNC_INTERVAL=30000
+      - ENABLE_TRANSLATION=true
+    ports:
+      - "8085:8080"
+      - "5005:5005" # debug port
+    restart: on-failure
+
+  hdeu-mail:
+    image: hdeu-mail:latest
+    container_name: hdeu-mail
+    logging:
+      options:
+        max-size: "50m"
+    networks:
+      mongo-nw: {}
+      proxy-ui-nw: {}
+    build: ../hdeu-email # the location of the Dockerfile for the project (local f/s where the project is cloned)
+    depends_on:
+      mongodb:
+        condition: service_started
+    environment:
+      - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5011
+      - MONGO_DB_URI=mongodb://mongoAdmin:mongoSecret123!@mongodb:27017/?authSource=admin
+      - MONGO_DB=healthData-mailServerDB
+      - HTTP_PORT=1025
+      - EMAIL_SERVER_API_KEY=c3b8b49e-9f4b-4c44-8c3b-6b7e56e0c5e3
+      # Email mode:
+      # - none (default): disable sending
+      # - smtp: use SMTP (MailHog locally or real SMTP if configured)
+      # - rest: CNS REST API
+      - EMAIL_MODE=${EMAIL_MODE:-none}
+      - EMAIL_BASE_URL=https://webgate.acceptance.ec.europa.eu/cns/services/rest/v1
+      - EMAIL_API_KEY=${MAIL_API_KEY}
+      - EMAIL_API_KEY_VALUE=${MAIL_API_KEY_VALUE}
+      - EMAIL_NOTIFICATION_GROUP=${EMAIL_NOTIFICATION_GROUP}
+      - CREATE_MESSAGE_SCHEDULER_ENABLE=1
+      - CREATE_MESSAGE_SCHEDULER_INTERVAL=6000
+      - MAIL_MAX_RETRIES=10
+      # SMTP configuration (used only when EMAIL_MODE=smtp)
+      - MAIL_ASSETS_BASE_URL=http://healthdata-local.com/mail-assets
+      - MAIL_DEFAULT_PREFERENCES_LINK=http://healthdata-local.com/healthdata-central-platform/userProfilePanel?tab=audit
+      - MAIL_DEFAULT_SUPPORT_EMAIL=${MAIL_DEFAULT_SUPPORT_EMAIL}
+      # SMTP server config
+      - MAIL_SMTP_HOST=${MAIL_SMTP_HOST:-smtp.gmail.com}
+      - MAIL_SMTP_PORT=${MAIL_SMTP_PORT:-587}
+      - MAIL_SMTP_USERNAME=${MAIL_SMTP_USERNAME}
+      - MAIL_SMTP_PASSWORD=${MAIL_SMTP_PASSWORD}
+      - MAIL_SMTP_STARTTLS=true
+      - MAIL_SMTP_SSL=false
+      - MAIL_SMTP_FROM=${MAIL_SMTP_FROM:-${MAIL_SMTP_USERNAME}}
+    ports:
+      - "1025:1025"
+      - "5011:5011"
+      - "8087:8087"   # HTTP for serving assets
+
+  # MailHog - Local development/testing SMTP server (host:mailhog, SMTP:1025, UI:8025)
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    networks:
+      mongo-nw: {}
+    ports:
+      - "11025:1025"
+      - "8025:8025"
+
+  hdeu-auth:
+    image: hdeu-auth:latest
+    container_name: hdeu-auth
+    build: ../hdeu-auth # the location of the Dockerfile for the project (local f/s where the project is cloned)
+    logging:
+      options:
+        max-size: "50m"
+    networks:
+      ui-repo-nw: {}
+      proxy-ui-nw: {}
+    environment:
+      - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010
+      - KEYCLOAK_REALM_ENDPOINT=${KEYCLOAK_DOCKER_ADDRESS}/realms/healthdata
+      - KEYCLOAK_ADDRESS=${KEYCLOAK_DOCKER_ADDRESS}
+      - KEYCLOAK_REALM_NAME=healthdata
+      - KEYCLOAK_MASTER_REALM_ENDPOINT=${KEYCLOAK_DOCKER_ADDRESS}/realms/master
+      - KEYCLOAK_TOKEN_PATH=/protocol/openid-connect/token
+      - KEYCLOAK_INTROSPECT_PATH=/protocol/openid-connect/token/introspect
+      - KEYCLOAK_CLIENT_ID=eu-login-client
+      - KEYCLOAK_CLIENT_SECRET=HCOZDh8XP2cDBuyidDDnqdFrL2haM31s
+      - KEYCLOAK_SUBJECT_ISSUER=eulogin-aws
+      - KEYCLOAK_REDIRECT_URI=${HEALTHDATA_SERVER_NAME}
+      - KEYCLOAK_USER_DELETE_PATH=${KEYCLOAK_DOCKER_ADDRESS}/admin/realms/healthdata/users/
+      - KEYCLOAK_ADMIN_USERNAME=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - EULOGIN_CLIENT_ID=
+      - EULOGIN_CLIENT_SECRET=
+      - EULOGIN_AUTHORIZE_ENDPOINT=${EU_LOGIN_SERVER_ADDRESS}/cas/oauth2/authorize
+      - EULOGIN_LOGOUT_ENDPOINT=${EU_LOGIN_SERVER_ADDRESS}/cas/logout
+      - EULOGIN_LOGOUT_REDIRECT_URI=${HEALTHDATA_SERVER_NAME}/auth/api/logout
+      - EULOGIN_TOKEN_ENDPOINT=${EU_LOGIN_SERVER_ADDRESS}/cas/oauth2/token
+      - EULOGIN_REDIRECT_URI=${EULOGIN_REDIRECT_URI}
+      - ACCESS_COOKIE_SECURE=${HEALTHDATA_ACCESS_COOKIE_SECURE}
+      - COOKIES_DOMAIN=${HEALTHDATA_COOKIES_DOMAIN}
+      - IS_DEV_MODE=true # Set to true to enable dev mode and enable only keycloak login
+    ports:
+      - "8086:8080"
+      - "5010:5010" # debug port
+
+  opensearch:
+    image: opensearchproject/opensearch:1.3.20
+    container_name: opensearch
+    environment:
+      - cluster.name=opensearch-cluster
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - indices.query.bool.max_clause_count=8192
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    networks:
+      elastic-nw: {}
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:1.3.20
+    container_name: opensearch-dashboards
+    environment:
+      - OPENSEARCH_HOSTS=http://opensearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - opensearch
+    networks:
+      elastic-nw: {}
+
+  mongodb:
+    image: mongo:5.0
+    container_name: mongodb
+    logging:
+      options:
+        max-size: "50m"
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      mongo-nw: {}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=mongoAdmin
+      - MONGO_INITDB_ROOT_PASSWORD=mongoSecret123!
+
+  virtuoso:
+    image: openlink/virtuoso-opensource-7:7.2.16
+    container_name: virtuoso
+    logging:
+      options:
+        max-size: "50m"
+    ports:
+      - "8890:8890"
+      - "1111:1111"
+    networks:
+      virtuoso-repo-nw: {}
+      ui-virtuoso-nw: {}
+      proxy-ui-nw: {}
+    volumes:
+      - virtuoso:/usr/local/virtuoso-opensource/var/lib/virtuoso/db
+    environment:
+      - DBA_PASSWORD=dba
+
+  shadow-virtuoso:
+    image: openlink/virtuoso-opensource-7:7.2.16
+    container_name: shadow-virtuoso
+    logging:
+      options:
+        max-size: "50m"
+    ports:
+      - "9890:8890"
+      - "9111:1111"
+    networks:
+      virtuoso-repo-nw: {}
+    volumes:
+      - shadow-virtuoso:/usr/local/virtuoso-opensource/var/lib/virtuoso/db
+    environment:
+      - DBA_PASSWORD=dba
+
+  # hdeu-hub-statistics:
+  #   image: hdeu-hub-statistics:latest
+  #   container_name: hdeu-hub-statistics
+  #   build: ../hdeu-hub-statistics # the location of the Dockerfile for the project (local f/s where the project is cloned)
+  #   ports:
+  #     - "9090:9090"
+  #   environment:
+  #     - HUB_MAIN_URL=http://hdeu-hub-search:8080/search
+  #     - HUB_CATALOG_URI=filter=catalogue&limit=1000
+  #     - HUB_STATISTICS_API_KEY=8df0af7c-bbb0-4f9d-8532-341483ca2006
+  #     - FILE_UPLOAD_API=
+  #     - FILE_UPLOAD_AUTH=
+  #     - DIST_API=
+  #     - DIST_API_AUTH=
+  #     - HUB_AUTH_REQUIRED=false
+  #     - HUB_USER=
+  #     - HUB_PASSWORD=
+  #     - DB_USER=db_user
+  #     - DB_PASSWORD=wqwdqwefsdaw34%
+  #     - DB=statistics_db
+  #     - DB_HOST=statistic-db
+  #     - DB_PORT=5432
+  #     - DB_IN_DOCKER=true
+  #     - SCHEDULER_INTERVAL=10
+  #     - HEALTH_CATEGORIES_CONTROLLED_VOCABULARY_BASE_URL=https://hdeu-dcat.acceptance.data.health.europa.eu/resource/authority/healthcategories/
+  #   depends_on:
+  #     - statistic-db
+  #     - hdeu-hub-search
+  #   networks:
+  #     statistic-db-nw: {}
+  #     search-statistic-nw: {}
+  #     statistics-ui-nw: {}
+  #     proxy-ui-nw: {}
+  #   restart: always
+
+  # statistic-db:
+  #   image: postgres:17.5
+  #   container_name: statistic-db
+  #   volumes:
+  #     - pg_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5442:5432"
+  #   command: postgres -c 'max_connections=250' -c 'shared_buffers=2GB'
+  #   environment:
+  #     - POSTGRES_USER=db_user
+  #     - POSTGRES_PASSWORD=wqwdqwefsdaw34%
+  #     - POSTGRES_DB=statistics_db
+  #   networks:
+  #     statistic-db-nw: {}
+  #   restart: always
+
+  # statistics-db-pgadmin4:
+  #   container_name: pgadmin4-client
+  #   image: dpage/pgadmin4
+  #   ports:
+  #     - "7080:80"
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: pgadmin@eurodyn.com
+  #     PGADMIN_DEFAULT_PASSWORD: 1qaz#WSX
+  #   volumes:
+  #     - pgadmin_data:/var/lib/pgadmin
+  #     - ./postgres/servers.json:/pgadmin4/servers.json
+  #   networks:
+  #     statistic-db-nw: {}
+  #   restart: always
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0.4
+    container_name: keycloak
+    command: start-dev --import-realm # imports the healthdata realm
+    user: "${UID}:${GID}"
+    ports:
+      - "10000:8080"
+    networks:
+      ui-repo-nw: {}
+      proxy-ui-nw: {}
+    volumes:
+      - ./keycloak/data:/opt/keycloak/data
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_FEATURES=token-exchange,admin-fine-grained-authz
+      - KC_LOG_LEVEL=INFO
+      - KC_HEALTH_ENABLED=true
+      - KC_METRICS_ENABLED=true
+      - KC_HOSTNAME=${WEB_HOST} #required for redirect uri matching
+      - KC_HTTP_RELATIVE_PATH=/keycloak
+      - KC_PROXY=edge
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_LOG_LEVEL=debug
+    healthcheck:
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /keycloak/realms/healthdata/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'" ]
+      interval: 30s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  opensearch_data:
+  mongo_data:
+  virtuoso:
+  shadow-virtuoso:
+  pgadmin_data:
+  pg_data:
+  hub_data_upload:

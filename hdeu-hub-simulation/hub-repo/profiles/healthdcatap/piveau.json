@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "id": "healthdcat-ap",
+  "core": [
+    {
+      "id": "dataset",
+      "description": "A healthdcat-ap representation of a dataset",
+      "path": "healthdcat-ap.hub.shapes.ttl",
+      "name": "dataset",
+      "shapeUri": "http://healthdataportal.eu/ns/health#Dataset_Shape"
+    }
+  ]
+}

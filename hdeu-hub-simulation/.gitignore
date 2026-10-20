@@ -1,0 +1,4 @@
+*.iml
+.idea/
+keycloak/data/h2
+sonar-dt

@@ -1,0 +1,56 @@
+{
+  "analysis": {
+    "filter": {
+      "german_stop": {
+        "type": "stop",
+        "stopwords": "_german_"
+      },
+      "german_stemmer": {
+        "type": "stemmer",
+        "language": "light_german"
+      }
+    },
+    "analyzer": {
+      "edgengram_analyzer": {
+        "filter": ["lowercase"],
+        "tokenizer": "edgengram_tokenizer"
+      },
+      "german_custom": {
+        "tokenizer": "german_tokenizer",
+        "filter": [
+          "lowercase",
+          "german_stop",
+          "german_normalization",
+          "german_stemmer"
+        ]
+      }
+    },
+    "tokenizer": {
+      "edgengram_tokenizer": {
+        "type": "edge_ngram",
+        "min_gram": 1,
+        "max_gram": 50,
+        "token_chars": ["letter", "digit"]
+      },
+      "german_tokenizer": {
+        "type": "ngram",
+        "min_gram": 4,
+        "max_gram": 5,
+        "token_chars": ["letter", "digit"]
+      }
+    },
+    "normalizer": {
+      "keyword_lowercase": {
+        "type": "custom",
+        "filter": ["lowercase"]
+      }
+    }
+  },
+  "mapping": {
+    "total_fields": {
+      "limit": 8192
+    }
+  },
+  "number_of_shards": "1",
+  "number_of_replicas": "0"
+}

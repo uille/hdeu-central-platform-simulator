@@ -1,0 +1,14 @@
+FROM nginx:latest
+
+# Copy the Nginx configuration file to the container as a template
+COPY nginx_scenario.conf /etc/nginx/nginx.conf.template
+
+COPY start.sh /start.sh
+# Normalize Windows CRLF to Unix LF and make executable
+RUN sed -i 's/\r$//' /start.sh && chmod +x /start.sh
+
+# Set the default server name
+ENV SERVER_NAME=healthdata-local.com
+
+EXPOSE 80
+CMD ["/start.sh"]

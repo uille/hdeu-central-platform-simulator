@@ -1,0 +1,33 @@
+[submodule "hdeu-access"]
+	path = hdeu-access
+	url = ./hdeu-access
+[submodule "hdeu-auth"]
+	path = hdeu-auth
+	url = ./hdeu-auth
+[submodule "hdeu-dispatcher"]
+	path = hdeu-dispatcher
+	url = ./hdeu-dispatcher
+[submodule "hdeu-email"]
+	path = hdeu-email
+	url = ./hdeu-email/
+[submodule "hdeu-hub-repo"]
+	path = hdeu-hub-repo
+	url = ./hdeu-hub-repo/
+[submodule "hdeu-hub-search"]
+	path = hdeu-hub-search
+	url = ./hdeu-hub-search/
+[submodule "hdeu-hub-statistics"]
+	path = hdeu-hub-statistics
+	url = ./hdeu-hub-statistics/
+[submodule "hdeu-hub-store"]
+	path = hdeu-hub-store
+	url = ./hdeu-hub-store/
+[submodule "hdeu-hub-translation"]
+	path = hdeu-hub-translation
+	url = ./hdeu-hub-translation/
+[submodule "hdeu-hub-ui"]
+	path = hdeu-hub-ui
+	url = ./hdeu-hub-ui/
+[submodule "hdeu-starter-kit"]
+	path = hdeu-starter-kit
+	url = ./hdeu-starter-kit

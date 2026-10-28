@@ -1,1 +1,0 @@
-wget -q -O /dev/null http://${1}/routable

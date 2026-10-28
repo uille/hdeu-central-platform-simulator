@@ -1,5 +1,8 @@
 FROM nginx:latest
 
+# Install gettext for envsubst
+RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lists/*
+
 # Copy the Nginx configuration file to the container as a template
 COPY nginx_scenario.conf /etc/nginx/nginx.conf.template
 

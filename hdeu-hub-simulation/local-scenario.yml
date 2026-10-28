@@ -40,17 +40,41 @@ services:
       context: .
       dockerfile: Dockerfile_scenario
     ports:
-      - '${WEB_PORT}:8092'
+      - '${WEB_PORT}:${WEB_PORT}'
     environment:
       - SERVER_NAME=${WEB_HOST_NAME}
-    depends_on:
-      - hdeu-hub-ui
-      - hdeu-hub-repo
-      - hdeu-access
+      - WEB_PORT=${WEB_PORT}
+    cap_add:
+      - NET_RAW
     networks:
       proxy-ui-nw:
         aliases:
           - ${WEB_HOST_NAME} # This is the server name used in the reverse proxy and is needed for keycloak to work properly with health-data-auth
+
+  proxy-startup-gate:
+    image: curlimages/curl:latest
+    container_name: proxy-startup-gate
+    depends_on:
+      reverse-proxy:
+        condition: service_started
+    environment:
+      WEB_HOST_NAME: ${WEB_HOST_NAME}
+      WEB_PORT: ${WEB_PORT}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+
+        until curl --silent --fail --output /dev/null \
+          --max-time 3 \
+          "http://$${WEB_HOST_NAME}:$${WEB_PORT}/routable"
+        do
+          echo "Waiting for the reverse-proxy route to become available..."
+          sleep 2
+        done
+
+        echo "Reverse-proxy route is available."
+    restart: "no"
 
   hdeu-hub-repo:
     image: hdeu-hub-repo:latest
@@ -66,7 +90,6 @@ services:
     volumes:
       - ./hub-repo/conf/config.json:/usr/verticles/conf/config.json
       - ./hub-repo/profiles/healthdcatap:/usr/verticles/profiles/healthdcatap
-      - ./check-intercontainer-alias-routability.sh:/health/check-intercontainer-alias-routability.sh
     environment:
       - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006
       - HUB_REPO_API_KEY=7c6a7c98-20e1-4915-ba0c-985b6724560b
@@ -97,12 +120,6 @@ services:
       data-upload-repo-nw: {}
       ui-repo-nw: {}
       proxy-ui-nw: {}
-    healthcheck:
-      test: ["CMD", "/health/check-intercontainer-alias-routability.sh","${WEB_HOST}"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   # hdeu-hub-translation:
   #   image: hdeu-hub-translation:latest
@@ -145,8 +162,6 @@ services:
         max-size: "50m"
     container_name: hdeu-hub-ui
     build: ../hdeu-hub-ui # the location of the Dockerfile for the project (local f/s where the project is cloned)
-    ports:
-      - "8080:8080"
     environment:
       - JAVA_OPTS=-Xms300m -Xmx1g
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:?}
@@ -174,22 +189,14 @@ services:
     depends_on:
       hdeu-hub-repo:
         condition: service_started
-      keycloak:
-        condition: service_healthy
+      keycloak-startup-gate:
+        condition: service_completed_successfully
     networks:
       ui-search-nw: {}
       ui-repo-nw: {}
       ui-virtuoso-nw: {}
       ui-data-upload-nw: {}
       proxy-ui-nw: {}
-    volumes:
-      - ./check-intercontainer-alias-routability.sh:/health/check-intercontainer-alias-routability.sh
-    healthcheck:
-      test: ["CMD", "/health/check-intercontainer-alias-routability.sh","${WEB_HOST}"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-      start_period: 10s  
 
   hdeu-hub-search:
     image: hdeu-hub-search:latest
@@ -201,7 +208,6 @@ services:
       context: ../hdeu-hub-search # the location of the Dockerfile for the project (local f/s where the project is cloned)
     volumes:
       - ./hub-search/conf:/usr/verticles/conf
-      - ./check-intercontainer-alias-routability.sh:/health/check-intercontainer-alias-routability.sh
     networks:
       elastic-nw: {}
       search-repo-nw: {}
@@ -217,12 +223,6 @@ services:
       - "8082:8080"
       - "8083:8081"
       - "5007:5007" # debug port
-    healthcheck:
-      test: ["CMD", "/health/check-intercontainer-alias-routability.sh","${WEB_HOST}"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-      start_period: 10s  
 
   hdeu-hub-store:
     image: hdeu-hub-store:latest
@@ -240,7 +240,6 @@ services:
       - mongodb
     volumes:
       - hub_data_upload:/usr/verticles/simplestore
-      - ./check-intercontainer-alias-routability.sh:/health/check-intercontainer-alias-routability.sh
     environment:
       - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5009
       - MONGO_DB_URI=mongodb://mongoAdmin:mongoSecret123!@mongodb:27017/?authSource=admin
@@ -251,13 +250,7 @@ services:
     ports:
       - "8081:8080"
       - "5009:5009" # debug port
-    healthcheck:
-      test: ["CMD", "/health/check-intercontainer-alias-routability.sh","${WEB_HOST}"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-      start_period: 10s  
-
+  
   hdeu-access:
     image: hdeu-access:latest
     container_name: hdeu-access
@@ -269,11 +262,13 @@ services:
       mongo-nw: {}
       ui-repo-nw: {}
       proxy-ui-nw: {}
+    # cap_add:
+    #   - NET_RAW
     depends_on:
       mongodb:
         condition: service_started
-      keycloak:
-        condition: service_healthy
+      keycloak-startup-gate:
+        condition: service_completed_successfully
     environment:
       - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
       - MONGO_DB_URI=mongodb://mongoAdmin:mongoSecret123!@mongodb:27017/?authSource=admin
@@ -319,14 +314,6 @@ services:
       - "8085:8080"
       - "5005:5005" # debug port
     restart: on-failure
-    volumes:
-      - ./check-intercontainer-alias-routability.sh:/health/check-intercontainer-alias-routability.sh
-    healthcheck:
-      test: ["CMD", "/health/check-intercontainer-alias-routability.sh","${WEB_HOST}"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   hdeu-mail:
     image: hdeu-mail:latest
@@ -375,14 +362,6 @@ services:
       - "1025:1025"
       - "5011:5011"
       - "8087:8087"   # HTTP for serving assets
-    volumes:
-      - ./check-intercontainer-alias-routability.sh:/health/check-intercontainer-alias-routability.sh
-    healthcheck:
-      test: ["CMD", "/health/check-intercontainer-alias-routability.sh","${WEB_HOST}"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   # MailHog - Local development/testing SMTP server (host:mailhog, SMTP:1025, UI:8025)
   mailhog:
@@ -432,15 +411,7 @@ services:
     ports:
       - "8086:8080"
       - "5010:5010" # debug port
-    volumes:
-      - ./check-intercontainer-alias-routability.sh:/health/check-intercontainer-alias-routability.sh
-    healthcheck:
-      test: ["CMD", "/health/check-intercontainer-alias-routability.sh","${WEB_HOST}"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
+   
   opensearch:
     image: opensearchproject/opensearch:1.3.20
     container_name: opensearch
@@ -514,14 +485,6 @@ services:
       - virtuoso:/usr/local/virtuoso-opensource/var/lib/virtuoso/db
     environment:
       - DBA_PASSWORD=dba
-    volumes:
-      - ./check-intercontainer-alias-routability.sh:/health/check-intercontainer-alias-routability.sh
-    healthcheck:
-      test: ["CMD", "/health/check-intercontainer-alias-routability.sh","${WEB_HOST}"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   shadow-virtuoso:
     image: openlink/virtuoso-opensource-7:7.2.16
@@ -617,7 +580,6 @@ services:
       proxy-ui-nw: {}
     volumes:
       - ./keycloak/data:/opt/keycloak/data
-      - ./get_resource.sh:/health/get_resource.sh
     environment:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
@@ -630,11 +592,32 @@ services:
       - KC_PROXY=edge
       - KC_PROXY_HEADERS=xforwarded
       - KC_LOG_LEVEL=info
-    healthcheck:
-      test: [ "CMD-SHELL", "/health/get_resource.sh localhost 8080  \"/keycloak/realms/healthdata/.well-known/openid-configuration\" && /health/get_resource.sh ${WEB_HOST_NAME} ${WEB_PORT} \"routable\""]
-      interval: 30s
-      timeout: 5s
-      retries: 30
+
+  keycloak-startup-gate:
+    image: curlimages/curl:latest
+    container_name: keycloak-startup-gate
+    networks:
+      proxy-ui-nw: {}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+
+        ENDPOINTS="http://keycloak:9000/health/ready
+        http://keycloak:8080/keycloak/realms/healthdata/.well-known/openid-configuration"
+
+        echo "Waiting for Keycloak readiness..."
+
+        for endpoint in $ENDPOINTS; do
+          until curl --fail --silent --output /dev/null --max-time 5 "$endpoint"; do
+            echo "Endpoint not ready: $endpoint"
+            sleep 2
+          done
+        done
+
+        echo "All Keycloak endpoints are ready."
+    restart: "no"
+
 
 volumes:
   opensearch_data:

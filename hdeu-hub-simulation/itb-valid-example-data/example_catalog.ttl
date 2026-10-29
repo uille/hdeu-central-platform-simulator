@@ -12,15 +12,15 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://piveau.io/id/catalogue/test-catalog>
+<https://piveau.io/id/catalogue/550e8400-e29b-41d4-a716-446655440001>
     a dcat:Catalog ;
     dct:type "dcat-ap";
     dct:title "Example Catalog"@en ;
     dct:description "This is an example Catalog"@en ;
     dct:language  <http://publications.europa.eu/resource/authority/language/ENG> ;
     dct:spatial <http://publications.europa.eu/resource/authority/country/ESP> ;
-    dcat:dataset <https://piveau.io/set/data/test-dataset> ;
-    dcat:record <https://piveau.io/set/record/test-dataset> ;
+    dcat:dataset <https://piveau.io/set/data/550e8400-e29b-41d4-a716-446655440000> ;
+    dcat:record <https://piveau.io/set/record/550e8400-e29b-41d4-a716-446655440000> ;
     dct:publisher  [
         a foaf:Agent ;
         foaf:homepage  <http://www.fokus.fraunhofer.de> ;

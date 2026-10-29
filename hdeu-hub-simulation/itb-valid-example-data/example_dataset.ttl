@@ -21,9 +21,9 @@
 
 
 
-<https://piveau.io/set/data/test-dataset>
+<https://piveau.io/set/data/550e8400-e29b-41d4-a716-446655440000>
     a dcat:Dataset ;
-    dct:identifier "test-dataset" ;
+    dct:identifier "550e8400-e29b-41d4-a716-446655440000" ;
     dct:title "Example Dataset 2"@en ;
     dct:title "Beispieldatensatz"@de-t-en-t0-mtec ;
     dct:language <http://publications.europa.eu/resource/authority/language/ENG> ;
@@ -146,12 +146,12 @@
 <https://example.de/def/conformsto>
     skos:prefLabel "Conforms To 2" .
 
-<https://piveau.io/set/record/test-dataset>
+<https://piveau.io/set/record/550e8400-e29b-41d4-a716-446655440000>
     a dcat:CatalogRecord ;
     dct:creator <http://piveau.io> ;
-    foaf:primaryTopic <https://piveau.io/set/data/test-dataset> ;
+    foaf:primaryTopic <https://piveau.io/set/data/550e8400-e29b-41d4-a716-446655440000> ;
     dct:modified "2018-04-03T13:48:21.00"^^xsd:dateTime ;
-    dct:identifier "test-dataset" .
+    dct:identifier "550e8400-e29b-41d4-a716-446655440000" .
 
 <http://www.doi.org/1234/123456789>
     a       adms:Identifier ;

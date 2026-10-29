@@ -155,6 +155,26 @@ services:
   #     proxy-ui-nw: { }
   #     statistic-db-nw: { }
 
+  # Stub Translation Service - replaces hdeu-hub-translation in translation-disabled deployments
+  translation-stub:
+    image: translation-stub:latest
+    container_name: translation-stub
+    build:
+      context: ../hdeu-translation-stub
+      dockerfile: Dockerfile
+    logging:
+      options:
+        max-size: "50m"
+    ports:
+      - "8084:8084"
+    environment:
+      - STUB_API_KEY=c0107b96-78a1-408e-b05f-a65eb3a3d0a8
+    networks:
+      - mongo-nw
+      - ui-repo-nw
+      - proxy-ui-nw
+    restart: unless-stopped
+
   hdeu-hub-ui:
     image: hdeu-hub-ui:latest
     logging:
@@ -269,6 +289,8 @@ services:
         condition: service_started
       keycloak-startup-gate:
         condition: service_completed_successfully
+      translation-stub:
+        condition: service_started
     environment:
       - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
       - MONGO_DB_URI=mongodb://mongoAdmin:mongoSecret123!@mongodb:27017/?authSource=admin
@@ -286,8 +308,12 @@ services:
       - DISPATCHER_X_API_KEY=47173bdf-bba8-436c-912c-ad12be97ba34
       - HUB_REPO_URL=http://hdeu-hub-repo:8080
       - HUB_REPO_X_API_KEY=7c6a7c98-20e1-4915-ba0c-985b6724560b
-      - TRANSLATION_SERVICE_URL=http://hdeu-hub-translation:8080/translation-service
-      - TRANSLATION_SERVICE_FILE_URL=http://hdeu-hub-translation:8080/file-translation-service
+      # - TRANSLATION_SERVICE_URL=http://hdeu-hub-translation:8080/translation-service
+      # - TRANSLATION_SERVICE_FILE_URL=http://hdeu-hub-translation:8080/file-translation-service
+      # - TRANSLATION_SERVICE_CALLBACK_URL=http://hdeu-access:8080/translation
+      # - TRANSLATION_SERVICE_X_API_KEY=bc6dba36-e87e-4c27-95ba-ff3777acc703
+      - TRANSLATION_SERVICE_URL=http://translation-stub:8084/translation-service
+      - TRANSLATION_SERVICE_FILE_URL=http://translation-stub:8084/file-translation-service
       - TRANSLATION_SERVICE_CALLBACK_URL=http://hdeu-access:8080/translation
       - TRANSLATION_SERVICE_X_API_KEY=bc6dba36-e87e-4c27-95ba-ff3777acc703
       - TRANSLATION_RETRY_INTERVAL=18000000
@@ -299,7 +325,7 @@ services:
       - EXPORT_DATA_ACCESS_API_KEY=0e3296cb-5106-4d77-9e9d-25ef9b6eac71gv
       - ITB_VALIDATOR_ENDPOINT=https://health-data-itb-rdf-validator.acceptance.data.health.europa.eu/shacl/ehds/api/validate
       - OUTGOING_APPLICATION_ACTIVITIES_INTERVAL=60000
-      - OUTGOING_APPLICATION_ACTIVITIES_ENABLE=1
+      - OUTGOING_APPLICATION_ACTIVITIES_ENABLE=0 # 0 here disables sending "DRAFT" applications to Dispatcher
       - WITHDRAW_RUN_TIME=06:00
       - WITHDRAW_THRESHOLD_DAYS=28
       - ADDITIONAL_INFO_WITHDRAW_THRESHOLD_DAYS=28

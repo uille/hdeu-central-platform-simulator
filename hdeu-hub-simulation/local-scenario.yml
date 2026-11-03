@@ -630,7 +630,8 @@ services:
         set -eu
 
         ENDPOINTS="http://keycloak:9000/health/ready
-        http://keycloak:8080/keycloak/realms/healthdata/.well-known/openid-configuration"
+        http://keycloak:8080/keycloak/realms/healthdata/.well-known/openid-configuration
+        http://keycloak:8080/keycloak/realms/healthdata/protocol/openid-connect/certs"
 
         echo "Waiting for Keycloak readiness..."
 

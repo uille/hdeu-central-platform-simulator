@@ -2,15 +2,16 @@
 
 ## Overview
 
-**hdeu-dispatcher-stub** is a minimal HTTP stub server that mimics the [hdeu-dispatcher](../hdeu-dispatcher/README.md) REST API surface. It acknowledges all requests with the correct HTTP status codes while silently discarding all payloads.
+**hdeu-dispatcher-stub** is a minimal HTTP stub server that mimics the [hdeu-dispatcher](../hdeu-dispatcher/README.md) REST API surface. It acknowledges all requests with the correct status codes and simulates the full dispatcher callback lifecycle.
 
-This module enables a **dispatcher-disabled deployment** of the EU Health Data (HD-EU) Central Platform where:
+When `POST /data-permit/create/application` is received:
 
-- Catalogue operations (create/update/delete) succeed without a real dispatcher
-- Application dispatch requests are ACKed but never forwarded to national gateways
-- Domibus messaging is entirely bypassed
-- Dataset metadata is managed directly via the hub-repo API
-- Application status is managed directly via the hdeu-access REST API
+1. The stub ACKs with `201 Created`
+2. After a configurable delay (default: 2 seconds), the stub calls back to hdeu-access
+3. The callback is `POST /dispatcher/status` with status `"domibus_national_received"`
+4. hdeu-access updates the application's catalog status from `SENT` to `SUBMITTED`
+
+This enables end-to-end testing of the dispatching workflow without a real Domibus backend.
 
 ## How It Works
 
@@ -68,6 +69,16 @@ These environment variables control the periodic schedulers that poll for pendin
 | `DATA_ACCESS_DISPATCHER_INTERVAL` | `60000` | `999999999` | Interval (ms) for data access application dispatcher |
 | `DATA_REQUEST_DISPATCHER_INTERVAL` | `60000` | `999999999` | Interval (ms) for data request application dispatcher |
 | `DATA_ACCESS_DISPATCHER_FOR_SENT_APPLICATIONS_INTERVAL` | `60000` | `999999999` | Interval (ms) for polling sent data access application statuses |
+
+### Stub Dispatcher Environment Variables
+
+The stub dispatcher can be configured with these environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CALLBACK_DELAY_SECONDS` | `2` | Delay in seconds before sending the callback to hdeu-access. Simulates processing time. |
+| `HEALTH_DATA_ACCESS_URL` | `http://hdeu-access:8080` | URL of the hdeu-access service. Used for the callback endpoint. |
+| `HEALTH_DATA_ACCESS_API_KEY` | `c0107b96-78a1-408e-b05f-a65eb3a3d0a8` | API key sent in `X-API-Key` header for the callback to hdeu-access. |
 | `DATA_REQUEST_DISPATCHER_FOR_SENT_APPLICATIONS_INTERVAL` | `60000` | `999999999` | Interval (ms) for polling sent data request application statuses |
 | `WITHDRAW_DISPATCHER_INTERVAL` | `86400000` | `999999999` | Interval (ms) for withdraw application scheduler |
 | `WITHDRAW_THRESHOLD_DAYS` | `28` | `9999` | Threshold (days) for withdraw eligibility |
@@ -123,35 +134,48 @@ hdeu-access:
 ```
 hdeu-hub-ui (frontend)
     │
-    ├── POST /api/data-request-application → hdeu-access (MongoDB insert)
-    │       │
-    │       └── Application stored with status="PENDING"
-    │       (scheduler never fires due to large intervals)
+    └── User submits application (status → SUBMITTED)
     │
     ▼
 hdeu-access (backend)
     │
-    ├── Catalogue create/update/delete
-    │       │
-    │       ├── DispatcherClient.createCatalogueMap() → stub-dispatcher:5100
-    │       │       └── Returns 201 Created (ACKed, payload dropped)
-    │       │
-    │       └── DispatcherClient.updateCatalogueMap() → stub-dispatcher:5100
-    │               └── Returns 200 OK (ACKed, payload dropped)
+    ├── 1. Save application to DATA_ACCESS_APPLICATION collection
+    │       (status = ON_GOING)
     │
-    ▼
-stub-dispatcher
+    ├── 2. Save to DISPATCHER collection
+    │       (configuration.status = "pending")
     │
-    ├── ACKs all requests with correct HTTP status codes
-    ├── Silently drops all request bodies
-    └── Never forwards anything to Domibus or national gateways
+    ├── 3. Scheduled job picks up pending records
+    │       (every DATA_ACCESS_DISPATCHER_INTERVAL ms)
+    │
+    └── 4. POST /data-permit/create/application
+            → stub-dispatcher:5100
+                │
+                ├── Returns 201 Created (ACK)
+                │
+                └── After CALLBACK_DELAY_SECONDS:
+                    │
+                    ▼
+            hdeu-access:8080/dispatcher/status
+                │
+                ├── POST with X-API-Key header
+                ├── Body: {
+                │     "application_id": "...",
+                │     "status": "domibus_national_received",
+                │     "data_permit_id": "...",
+                │     "catalog_ids": ["..."]
+                │   }
+                │
+                └── hdeu-access updates catalog status:
+                    SENT → SUBMITTED
+                    (application is now "dispatched")
 ```
 
 ## Deployment Scenarios
 
-### Scenario 1: Full Dispatcher-Disabled (Recommended)
+### Scenario 1: Stub Dispatcher (End-to-End Simulation)
 
-Use the stub + disabled schedulers. All catalogue and application operations succeed locally. No cross-border messaging.
+Use the stub to simulate the full dispatcher lifecycle. Applications are dispatched and the stub calls back to hdeu-access.
 
 ```yaml
 # In local-scenario.yml or your compose file
@@ -161,17 +185,22 @@ services:
     container_name: stub-dispatcher
     ports: ["5100:5100"]
     networks: [mongo-network, ui-repo-network, proxy-ui-network]
+    environment:
+      - CALLBACK_DELAY_SECONDS=2
+      - HEALTH_DATA_ACCESS_URL=http://hdeu-access:8080
+      - HEALTH_DATA_ACCESS_API_KEY=c0107b96-78a1-408e-b05f-a65eb3a3d0a8
 
   hdeu-access:
     environment:
       - DISPATCHER_URL=http://stub-dispatcher:5100
-      - OUTGOING_APPLICATION_ACTIVITIES_ENABLE=0
-      - DATA_ACCESS_DISPATCHER_INTERVAL=999999999
-      - DATA_REQUEST_DISPATCHER_INTERVAL=999999999
-      # ... (see complete configuration above)
+      # Keep schedulers enabled (or use reasonable intervals)
+      - DATA_ACCESS_DISPATCHER_INTERVAL=5000
+      # ... other hdeu-access config
 ```
 
 ### Scenario 2: Selective Dispatcher (Production + Stub for ITB)
+
+Use a real dispatcher for production catalogues and the stub for ITB/test catalogues. This requires catalogue-specific routing logic in the dispatcher itself (not the stub).
 
 Use a real dispatcher for production catalogues and the stub for ITB/test catalogues. This requires catalogue-specific routing logic in the dispatcher itself (not the stub).
 
@@ -206,12 +235,27 @@ curl -X POST http://localhost:5100/application/activity \
   -w "\nHTTP Status: %{http_code}\n"
 ```
 
+#### Testing with callback
+
+The stub always sends a callback to hdeu-access after receiving `POST /data-permit/create/application`. You can verify the callback by:
+
+1. Starting hdeu-access with the dispatcher schedulers enabled
+2. Submitting an application through the UI
+3. Watching the logs for the callback:
+   ```
+   [stub-dispatcher] INFO Scheduled callback for application_id=..., data_permit_id=..., catalog_ids=[...]
+   [stub-dispatcher] INFO Sending callback to hdeu-access: http://hdeu-access:8080/dispatcher/status
+   [stub-dispatcher] INFO Callback succeeded: status=200, body={"result_message":"ok"}
+   ```
+
+4. Checking that the application's catalog status has changed from `SENT` to `SUBMITTED` in the MongoDB `DATA_ACCESS_APPLICATION` collection.
+
 ### Expected responses
 
 ```
 # POST /catalogs → 201 Created (no body)
 # GET /catalogs → 200 OK, body: []
-# POST /data-permit/create/application → 201 Created (no body)
+# POST /data-permit/create/application → 201 Created, body: [{"application_id":"...","status":"dispatcher_received","catalog_ids":["..."],"data_permit_id":"...","application_type":"DATA_ACCESS_APPLICATION"}]
 # POST /application/activity → 201 Created (no body)
 # DELETE /catalogs/{id} → 200 OK (no body)
 ```
@@ -219,9 +263,10 @@ curl -X POST http://localhost:5100/application/activity \
 ## Limitations
 
 - **No SOAP/AS4 support:** The stub does not implement the Domibus SOAP web service (`BackendInterface`). If any component expects to receive SOAP messages from Domibus, this stub cannot handle them.
-- **No message persistence:** All request bodies are silently discarded. Nothing is stored or forwarded.
-- **No authentication:** The stub accepts requests with any API key. This is intentional for the dispatcher-disabled use case.
+- **In-memory storage only:** Received applications are stored in memory and lost on restart. This is intentional for the dispatcher simulation use case.
+- **No authentication:** The stub accepts requests with any API key. This is intentional for the dispatcher simulation use case.
 - **No health check endpoint:** The stub does not implement a `/health` endpoint. If a health check is required, add one to the handler.
+- **Callback requires network access:** The stub must be able to reach hdeu-access at `HEALTH_DATA_ACCESS_URL`. Ensure both services are on the same Docker network.
 
 ## Files
 

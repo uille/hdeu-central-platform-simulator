@@ -97,8 +97,9 @@ services:
       - HUB_SEARCH_SERVICE_URL=hdeu-hub-search
       - HUB_SEARCH_SERVICE_PORT=8080
       - TRANSLATION_SERVICE_API_KEY=bc6dba36-e87e-4c27-95ba-ff3777acc703
-      - TRANSLATION_SERVICE_URL=http://hdeu-hub-translation:8080/translation-service
       - TRANSLATION_SERVICE_CALLBACK_URL=http://hdeu-hub-repo:8080/translation
+      # - TRANSLATION_SERVICE_URL=http://hdeu-hub-translation:8080/translation-service
+      - TRANSLATION_SERVICE_URL=http://translation-stub:8084/translation-service
       - HUB_STORE_DATA_UPLOAD_URL=http://hdeu-hub-store:8080
       - HUB_STORE_DATA_UPLOAD_SERVICE_URL=http://hdeu-hub-store:8080
       - HUB_STORE_DATA_UPLOAD_API_KEY=0e3296cb-5106-4d77-9e9d-25ef9b6eac71
@@ -325,14 +326,12 @@ services:
       - DISPATCHER_X_API_KEY=47173bdf-bba8-436c-912c-ad12be97ba34
       - HUB_REPO_URL=http://hdeu-hub-repo:8080
       - HUB_REPO_X_API_KEY=7c6a7c98-20e1-4915-ba0c-985b6724560b
-      # - TRANSLATION_SERVICE_URL=http://hdeu-hub-translation:8080/translation-service
-      # - TRANSLATION_SERVICE_FILE_URL=http://hdeu-hub-translation:8080/file-translation-service
-      # - TRANSLATION_SERVICE_CALLBACK_URL=http://hdeu-access:8080/translation
-      # - TRANSLATION_SERVICE_X_API_KEY=bc6dba36-e87e-4c27-95ba-ff3777acc703
-      - TRANSLATION_SERVICE_URL=http://translation-stub:8084/translation-service
-      - TRANSLATION_SERVICE_FILE_URL=http://translation-stub:8084/file-translation-service
       - TRANSLATION_SERVICE_CALLBACK_URL=http://hdeu-access:8080/translation
       - TRANSLATION_SERVICE_X_API_KEY=bc6dba36-e87e-4c27-95ba-ff3777acc703
+      # - TRANSLATION_SERVICE_URL=http://hdeu-hub-translation:8080/translation-service
+      # - TRANSLATION_SERVICE_FILE_URL=http://hdeu-hub-translation:8080/file-translation-service
+      - TRANSLATION_SERVICE_URL=http://translation-stub:8084/translation-service
+      - TRANSLATION_SERVICE_FILE_URL=http://translation-stub:8084/file-translation-service
       - TRANSLATION_RETRY_INTERVAL=18000000
       - TRANSLATION_RETRY_MAX_ATTEMPTS=3
       - CONTROLLED_VOCABULARY_REFRESH_INTERVAL=60000
@@ -352,7 +351,7 @@ services:
       - EXPIRATION_DAYS=90
       - DECISION_TRANSLATION_INTERVAL=30000
       - DECISION_SYNC_INTERVAL=30000
-      - ENABLE_TRANSLATION=true
+      - ENABLE_TRANSLATION=false
     ports:
       - "8085:8080"
       - "5005:5005" # debug port

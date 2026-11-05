@@ -14,3 +14,9 @@ curl -X POST "http://healthdata-local.com:8092/hub/api/repo/catalogues/550e8400-
 # Optional check dataset now exists
 
 curl -v "http://healthdata-local.com:8092/hub/api/repo/catalogues/550e8400-e29b-41d4-a716-446655440001/datasets?valueType=metadata" -H "X-Api-Key: 7c6a7c98-20e1-4915-ba0c-985b6724560b"
+
+
+# When application has been submitted and at ON-GOING state, change the catalog status and dataset specific permit
+
+by running change_to_permit_granted_state.sh
+

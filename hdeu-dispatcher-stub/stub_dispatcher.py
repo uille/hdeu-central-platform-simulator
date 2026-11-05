@@ -255,12 +255,12 @@ class StubDispatcherHandler(BaseHTTPRequestHandler):
         catalog_ids = callback_data["catalog_ids"]
 
         # Build the callback payload matching DispatcherMessage schema
-        callback_payload = {
+        callback_payload = [{
             "application_id": application_id,
             "status": "domibus_national_received",
             "data_permit_id": data_permit_id,
             "catalog_ids": catalog_ids,
-        }
+        }]
 
         callback_url = HEALTH_DATA_ACCESS_URL.rstrip("/") + "/dispatcher/status"
         payload_bytes = json.dumps(callback_payload).encode("utf-8")

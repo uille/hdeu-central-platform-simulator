@@ -26,8 +26,8 @@ API_KEY = os.environ.get("STUB_API_KEY", "c0107b96-78a1-408e-b05f-a65eb3a3d0a8")
 class StubTranslationHandler(BaseHTTPRequestHandler):
     ROUTE_STATUS = {
         "POST": {
-            "/translation-service": 200,
-            "/file-translation-service": 200,
+            "/translation-service": 204,
+            "/file-translation-service": 204,
             "/translation": 200,
         },
         "GET": {
@@ -64,8 +64,13 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
         try:
             data = json.loads(body)
             result["parsed"] = data
-            result["app_id"] = data.get("data", {}).get("applicationId", "unknown")
-            result["app_type"] = data.get("data", {}).get("applicationType", "unknown")
+            # Support both Flow 1/2 (applicationId/applicationType) and Flow 3 (id/type) payload formats
+            result["app_id"] = data.get("data", {}).get(
+                "applicationId", data.get("data", {}).get("id", "unknown")
+            )
+            result["app_type"] = data.get("data", {}).get(
+                "applicationType", data.get("data", {}).get("type", "unknown")
+            )
             result["callback_url"] = data.get("callback", {}).get("url", "")
         except (json.JSONDecodeError, AttributeError) as e:
             log.warning("Failed to parse request body: %s", e)
@@ -107,11 +112,17 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
             mock_dict[section_key] = {}
             if isinstance(section_value, dict):
                 for field_key, field_value in section_value.items():
-                    mock_dict[section_key][field_key] = (
-                        f"[TRANSLATED] {field_value}"
-                        if isinstance(field_value, str)
-                        else field_value
-                    )
+                    # Flow 3: field value is wrapped as {value, sourceLanguage, targetLanguages}
+                    if isinstance(field_value, dict):
+                        mock_dict[section_key][field_key] = field_value.get(
+                            "value", field_value
+                        )
+                    # Flow 2: field value is a plain string
+                    elif isinstance(field_value, str):
+                        mock_dict[section_key][field_key] = field_value
+                    # Flow 1 fallback: pass through as-is
+                    else:
+                        mock_dict[section_key][field_key] = field_value
             else:
                 mock_dict[section_key] = section_value
         return {

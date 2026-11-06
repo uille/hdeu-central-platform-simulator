@@ -1,12 +1,35 @@
 #!/usr/bin/env python3
 """
-Stub Translation Service - ACKs everything, simulates instant translation completion.
+Stub Translation Service - ACKs everything, simulates translation completion with a delay.
+
+A minimal HTTP server that mimics the translation service API surface
+so that hdeu-access believes the translation service is operational. All requests
+are acknowledged with the correct HTTP status code. When a translation request
+is received, the stub:
+
+1. ACKs immediately with the correct HTTP status code (204 for translation-service,
+   file-translation-service; 200 for /translation)
+2. Simulates processing delay (configurable via CALLBACK_DELAY_SECONDS env var,
+   default 2 seconds)
+3. Sends the callback to hdeu-access via the callback URL specified in the request
+
+This enables realistic timing for testing the translation callback flow,
+including potential race conditions between the scheduled translation job
+and the callback handler.
+
+Usage:
+    python3 stub_translation.py [PORT]       # PORT defaults to 8084
+
+Docker:
+    docker compose up -d --build
 """
 
 import json
 import logging
 import os
 import sys
+import threading
+import time
 import uuid
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
@@ -21,6 +44,8 @@ logging.basicConfig(
 log = logging.getLogger("stub-translation")
 
 API_KEY = os.environ.get("STUB_API_KEY", "c0107b96-78a1-408e-b05f-a65eb3a3d0a8")
+# Delay (seconds) before sending the callback after ACK
+CALLBACK_DELAY_SECONDS = int(os.environ.get("CALLBACK_DELAY_SECONDS", "2"))
 
 
 class StubTranslationHandler(BaseHTTPRequestHandler):
@@ -53,7 +78,12 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
     def _read_body(self) -> bytes:
         content_length = int(self.headers.get("Content-Length", 0))
         if content_length > 0:
-            return self.rfile.read(content_length)
+            body = self.rfile.read(content_length)
+            try:
+                log.info("_read_body: %s", body.decode("utf-8"))
+            except UnicodeDecodeError:
+                log.info("_read_body: %s", repr(body))
+            return body
         return b""
 
     def _parse_request(self) -> dict:
@@ -103,29 +133,45 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
             return False
 
     def _simulate_form_callback(self, parsed: dict) -> dict:
-        data = parsed.get("parsed", {}).get("data", {})
-        app_id = data.get("applicationId", "unknown")
-        app_type = data.get("applicationType", "unknown")
-        dict_data = data.get("dict", {})
+        request_data = parsed.get("parsed", {})
+        data = request_data.get("data", {})
+        # Flow 3: dict is at root level; Flow 2: dict is under data
+        dict_data = request_data.get("dict", data.get("dict", {}))
+
+        # Extract id from request payload (Flow 3) or app_id (Flow 1/2)
+        request_id = request_data.get("id", data.get("applicationId", str(uuid.uuid4())))
+
+        app_id = data.get("applicationId", data.get("id", "unknown"))
+        app_type = data.get("applicationType", data.get("type", "unknown"))
+
         mock_dict = {}
         for section_key, section_value in dict_data.items():
             mock_dict[section_key] = {}
             if isinstance(section_value, dict):
                 for field_key, field_value in section_value.items():
-                    # Flow 3: field value is wrapped as {value, sourceLanguage, targetLanguages}
                     if isinstance(field_value, dict):
-                        mock_dict[section_key][field_key] = field_value.get(
-                            "value", field_value
-                        )
-                    # Flow 2: field value is a plain string
+                        # Flow 3: field value is wrapped as {value, sourceLanguage, targetLanguages}
+                        original_value = field_value.get("value", "")
+                        target_langs = field_value.get("targetLanguages", ["en"])
+                        mock_dict[section_key][field_key] = {
+                            "value": original_value,
+                            "sourceLanguage": field_value.get("sourceLanguage", "LD"),
+                            "targetLanguages": target_langs,
+                            "translations": {lang: original_value for lang in target_langs},
+                        }
                     elif isinstance(field_value, str):
-                        mock_dict[section_key][field_key] = field_value
-                    # Flow 1 fallback: pass through as-is
+                        # Flow 2: field value is a plain string
+                        mock_dict[section_key][field_key] = {
+                            "value": field_value,
+                            "translations": {"en": field_value},
+                        }
                     else:
+                        # Fallback: pass through as-is
                         mock_dict[section_key][field_key] = field_value
             else:
                 mock_dict[section_key] = section_value
         return {
+            "id": request_id,
             "data": {
                 "id": app_id,
                 "type": app_type,
@@ -198,7 +244,7 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
         log.info("%s %s", self.client_address[0], format % args)
 
     def do_GET(self):
-        log.info("do_GET")
+        log.info("do_GET with ")
         self._read_body()
         code = self._get_response_code()
         body = b'{"status": "ok"}'
@@ -209,7 +255,7 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
-        log.info("do_POST")
+        log.info("do_POST with ")
         parsed = self._parse_request()
         code = self._get_response_code()
         path = self._route_key()
@@ -239,12 +285,20 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
                 callback_data = self._simulate_file_callback(parsed)
 
             log.info(
-                "Simulated %s completed for applicationId=%s, sending callback",
-                req_type, app_id,
+                "Simulated %s completed for applicationId=%s, scheduling callback in %ds",
+                req_type, app_id, CALLBACK_DELAY_SECONDS,
             )
 
+            # ACK immediately (below), then dispatch callback in a background thread
+            # This simulates real translation service processing time
             if callback_url:
-                self._send_callback(callback_url, callback_data)
+                timer = threading.Timer(
+                    CALLBACK_DELAY_SECONDS,
+                    self._send_callback,
+                    args=[callback_url, callback_data],
+                )
+                timer.daemon = True
+                timer.start()
             else:
                 log.warning("No callback URL in request, callback not sent")
 
@@ -258,6 +312,7 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_PUT(self):
+        log.info("do_PUT with ")
         self._read_body()
         code = self._get_response_code()
         self.send_response(code)
@@ -266,6 +321,7 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_DELETE(self):
+        log.info("do_DELETE with ")
         self._read_body()
         code = self._get_response_code()
         self.send_response(code)
@@ -277,4 +333,5 @@ class StubTranslationHandler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8084
     log.info("Stub translation service listening on port %d (API_KEY=%s)", port, API_KEY)
+    log.info("Callback delay: %d seconds", CALLBACK_DELAY_SECONDS)
     HTTPServer(("0.0.0.0", port), StubTranslationHandler).serve_forever()

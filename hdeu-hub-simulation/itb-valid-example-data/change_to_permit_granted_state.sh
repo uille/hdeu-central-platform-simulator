@@ -38,7 +38,7 @@ for NEW_STATUS in $STATUS_TRANSITIONS; do
  echo ""
 done
 
-Step 4: Set issue a positive decision
+#Step 4: Set issue a positive decision
 
 curl -X PUT "${BASE_URL}/dispatcher/decision" \
   -H 'Content-Type: application/json' \
@@ -59,7 +59,7 @@ curl -X PUT "${BASE_URL}/dispatcher/decision" \
         }
       ]
     }
-  }"
+  }" | jq .
 
 echo ""
 echo "=== Done ==="

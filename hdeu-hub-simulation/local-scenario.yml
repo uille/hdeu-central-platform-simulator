@@ -50,6 +50,8 @@ services:
       proxy-ui-nw:
         aliases:
           - ${WEB_HOST_NAME} # This is the server name used in the reverse proxy and is needed for keycloak to work properly with health-data-auth
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
 
   proxy-startup-gate:
     image: curlimages/curl:latest
@@ -308,8 +310,11 @@ services:
         condition: service_completed_successfully
       translation-stub:
         condition: service_started
+    volumes:
+      - ./certs/truststore.jks:/opt/certs/truststore.jks:ro
     environment:
       - JAVA_OPTS=-Xms300m -Xmx1g -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+      - JAVA_TOOL_OPTIONS=-Djavax.net.ssl.trustStore=/opt/certs/truststore.jks -Djavax.net.ssl.trustStorePassword=123456 -Djavax.net.ssl.trustStoreType=JKS
       - MONGO_DB_URI=mongodb://mongoAdmin:mongoSecret123!@mongodb:27017/?authSource=admin
       - MONGO_DB=healthData-DataAccessDB
       - HTTP_PORT=8080

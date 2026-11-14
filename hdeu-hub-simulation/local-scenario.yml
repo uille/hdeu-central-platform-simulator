@@ -53,12 +53,9 @@ services:
     volumes:
       - ./certs:/etc/nginx/certs:ro
 
-  proxy-startup-gate:
+  reverse-proxy-startup-gate:
     image: curlimages/curl:latest
-    container_name: proxy-startup-gate
-    depends_on:
-      reverse-proxy:
-        condition: service_started
+    container_name: reverse-proxy-startup-gate
     environment:
       WEB_HOST_NAME: ${WEB_HOST_NAME}
       WEB_PORT: ${WEB_PORT}
@@ -77,6 +74,8 @@ services:
 
         echo "Reverse-proxy route is available."
     restart: "no"
+    networks:
+      proxy-ui-nw: {}
 
   hdeu-hub-repo:
     image: hdeu-hub-repo:latest
@@ -301,12 +300,12 @@ services:
       mongo-nw: {}
       ui-repo-nw: {}
       proxy-ui-nw: {}
-    # cap_add:
-    #   - NET_RAW
     depends_on:
       mongodb:
         condition: service_started
       keycloak-startup-gate:
+        condition: service_completed_successfully
+      reverse-proxy-startup-gate:
         condition: service_completed_successfully
       translation-stub:
         condition: service_started
@@ -643,27 +642,11 @@ services:
   keycloak-startup-gate:
     image: curlimages/curl:latest
     container_name: keycloak-startup-gate
+    volumes:
+    - ./keycloak-startup-gate.sh:/keycloak-startup-gate.sh:ro
     networks:
       proxy-ui-nw: {}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -eu
-
-        ENDPOINTS="http://keycloak:9000/health/ready
-        http://keycloak:8080/keycloak/realms/healthdata/.well-known/openid-configuration
-        http://keycloak:8080/keycloak/realms/healthdata/protocol/openid-connect/certs"
-
-        echo "Waiting for Keycloak readiness..."
-
-        for endpoint in $ENDPOINTS; do
-          until curl --fail --silent --output /dev/null --max-time 5 "$endpoint"; do
-            echo "Endpoint not ready: $endpoint"
-            sleep 2
-          done
-        done
-
-        echo "All Keycloak endpoints are ready."
+    entrypoint: ["/bin/sh", "/keycloak-startup-gate.sh"]
     restart: "no"
 
 

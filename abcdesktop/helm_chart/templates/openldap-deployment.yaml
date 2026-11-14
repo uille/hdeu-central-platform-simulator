@@ -1,0 +1,47 @@
+{{- if .Values.openldap.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: openldap-od
+  labels:
+    abcdesktop/role: openldap
+spec:
+  selector:
+    matchLabels:
+      run: openldap-od
+  replicas: {{ .Values.openldap.replicaCount }}
+  template:
+    metadata:
+      namespace: {{ .Release.Namespace }}
+      labels:
+        run: openldap-od
+        netpol/dns: 'true'
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: {{ .Values.openldap.automountServiceAccountToken }}
+      containers:
+      - name: openldap
+        # abcdesktopio/docker-test-openldap:master
+        # is same as https://github.com/rroemhild/docker-test-openldap
+        # but with posixAccount support
+        image: {{ .Values.openldap.image }}:{{ .Values.openldap.tag }}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: {{ .Values.openldap.resources.limits.cpu }}
+            memory: {{ .Values.openldap.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.openldap.resources.requests.cpu }}
+            memory: {{ .Values.openldap.resources.requests.memory }}
+        ports:
+          - containerPort: 389
+          - containerPort: 636
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

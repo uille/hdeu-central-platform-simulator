@@ -1,0 +1,19 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: http-router
+  namespace: {{ .Release.Namespace }}
+  labels:
+    abcdesktop/role: router
+spec:
+  type: NodePort
+  selector:
+    run: router-od
+  ports:
+  - protocol: TCP
+    port: 80
+{{- if .Values.router.nodePort }}
+    nodePort: {{ .Values.router.nodePort }}
+{{- end }}
+    targetPort: 80
+    name: http

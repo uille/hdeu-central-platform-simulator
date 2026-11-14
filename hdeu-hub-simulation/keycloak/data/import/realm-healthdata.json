@@ -777,6 +777,8 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "HCOZDh8XP2cDBuyidDDnqdFrL2haM31s",
       "redirectUris": [
+        "http://localhost:30443/API/*",
+        "http://healthdata-local.com:30443/API/*",
         "/*"
       ],
       "webOrigins": [

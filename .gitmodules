@@ -1,33 +1,33 @@
 [submodule "hdeu-access"]
 	path = hdeu-access
-	url = ./hdeu-access
+	url = https://github.com/uille/hdeu-access-fork.git
 [submodule "hdeu-auth"]
 	path = hdeu-auth
-	url = ./hdeu-auth
+	url = https://code.europa.eu/healthdataeu/healthdataeu-eu-dataset-catalogue/hdeu-auth.git
 [submodule "hdeu-dispatcher"]
 	path = hdeu-dispatcher
-	url = ./hdeu-dispatcher
+	url = https://code.europa.eu/healthdataeu/healthdataeu-eu-dataset-catalogue/hdeu-dispatcher.git
 [submodule "hdeu-email"]
 	path = hdeu-email
-	url = ./hdeu-email/
+	url = https://code.europa.eu/healthdataeu/healthdataeu-eu-dataset-catalogue/hdeu-email.git
 [submodule "hdeu-hub-repo"]
 	path = hdeu-hub-repo
-	url = ./hdeu-hub-repo/
+	url = https://github.com/uille/hdeu-hub-repo-fork.git
 [submodule "hdeu-hub-search"]
 	path = hdeu-hub-search
-	url = ./hdeu-hub-search/
+	url = https://code.europa.eu/healthdataeu/healthdataeu-eu-dataset-catalogue/hdeu-hub-search.git
 [submodule "hdeu-hub-statistics"]
 	path = hdeu-hub-statistics
-	url = ./hdeu-hub-statistics/
+	url = https://code.europa.eu/healthdataeu/healthdataeu-eu-dataset-catalogue/hdeu-hub-statistics.git
 [submodule "hdeu-hub-store"]
 	path = hdeu-hub-store
-	url = ./hdeu-hub-store/
+	url = https://code.europa.eu/healthdataeu/healthdataeu-eu-dataset-catalogue/hdeu-hub-store.git
 [submodule "hdeu-hub-translation"]
 	path = hdeu-hub-translation
-	url = ./hdeu-hub-translation/
+	url = https://code.europa.eu/healthdataeu/healthdataeu-eu-dataset-catalogue/hdeu-hub-translation.git
 [submodule "hdeu-hub-ui"]
 	path = hdeu-hub-ui
-	url = ./hdeu-hub-ui/
+	url = https://code.europa.eu/healthdataeu/healthdataeu-eu-dataset-catalogue/hdeu-hub-ui.git
 [submodule "hdeu-starter-kit"]
 	path = hdeu-starter-kit
-	url = ./hdeu-starter-kit
+	url = https://code.europa.eu/healthdataeu/healthdataeu-eu-dataset-catalogue/hdeu-starter-kit.git

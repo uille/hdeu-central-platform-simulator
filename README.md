@@ -9,7 +9,7 @@ This is an intergration project that provides a cordoned runtime (no connectivit
 - Helm
 - mongosh
 
-Additionally either the host must be named 'healthdata-local.com' or aliased from localhost as such (in /etc/hosts). The 'healthdata-local.com' hostname is peppered into the myriad configuration files and modifying it is a task unto itself.
+Additionally either the host must be named 'healthdata-local.com' or alised from localhost as such (in /etc/hosts). The 'healthdata-local.com' hostname is peppered into the myriad configuration files and modifying it is a task unto itself.
 
 ## build and deploy hdeu-hub-simulation/local-scenario.conf
 
@@ -58,12 +58,13 @@ If the cert is changed, the hdeu-hub-simulator service bundle needs to be restar
 - hdeu-access still won't cleanly synchronize with keycloak ready up (hdeu-access start before keycloak is ready and fails when requesting JWKS from it)
 - email sending needs to be enabled and email infrastructure configure (SMPT server)
 - Keyclock needs to be disabled from dev mode (into production mode)
-- administrative interface ports (keycloak admin page ) need to be hidden (into local network accesses only)
+- administrative interface (keycloak admin page, abcdekstop admin page) need to be hidden (into local network accesses only)
 
 ## Use case flow
 
 # Add user credentials
 
+```
 podman exec -ti keycloak /bin/bash
 
 /opt/keycloak/bin/kcadm.sh config credential --server http://localhost:8080/keycloak --realm master --user admin --password admin
@@ -86,7 +87,7 @@ podman exec -ti keycloak /bin/bash
   -r healthdata \
   --uusername testuser \
   --rolename default-roles-healthdata
-
+```
 # User logs in and creates a data access application
 
 # User translates and submits the application
@@ -95,8 +96,8 @@ Currently there is no notification to admin/operator when this happens, needs so
 
 # administrator/operator approves the application
 
-see hdeu-hub-simulation/application-state-flow-scripts/README.md
+See hdeu-hub-simulation/application-state-flow-scripts/README.md
 
-# administrator/operator injects the data file onto the users desktop
+# administrator/operator injects the dataset file onto the users desktop
 
 The abcdesktop will mount users home folder from /mnt/abcdesktop_volumes/{user_name}. Drop the data file at /mnt/abcdesktop_volumes/{user_name}/Desktop/your_file_here, it will become visible to the user. Check file access rights. See /hdeu/abcdesktop/README.md

@@ -9,7 +9,7 @@ This is an intergration project that provides a cordoned runtime (no connectivit
 - Helm
 - mongosh
 
-Additionally either the host must be named 'healthdata-local.com' or alised from localhost as such (in /etc/hosts). The 'healthdata-local.com' hostname is peppered into the myriad configuration files and modifying it is a task unto itself.
+Additionally either the host must be named 'healthdata-local.com' or aliased from localhost as such (in /etc/hosts). The 'healthdata-local.com' hostname is peppered into the myriad configuration files and modifying it is a task unto itself.
 
 ## build and deploy hdeu-hub-simulation/local-scenario.conf
 
